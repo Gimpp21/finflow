@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 
 void main() {
   runApp(const FinFlowApp());
@@ -16,7 +18,7 @@ class FinFlowApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF1A3A6B)),
         useMaterial3: true,
       ),
-      home: const HomePage(),
+      home: const SplashScreen(),
     );
   }
 }
@@ -36,61 +38,392 @@ class Transacao {
     required this.valor,
     required this.isReceita,
   });
+
+  Map<String, dynamic> toJson() => {
+    'icon': icon,
+    'titulo': titulo,
+    'subtitulo': subtitulo,
+    'valor': valor,
+    'isReceita': isReceita,
+  };
+
+  factory Transacao.fromJson(Map<String, dynamic> json) => Transacao(
+    icon: json['icon'],
+    titulo: json['titulo'],
+    subtitulo: json['subtitulo'],
+    valor: json['valor'],
+    isReceita: json['isReceita'],
+  );
 }
 
+// Splash Screen
+class SplashScreen extends StatefulWidget {
+  const SplashScreen({super.key});
+
+  @override
+  State<SplashScreen> createState() => _SplashScreenState();
+}
+
+class _SplashScreenState extends State<SplashScreen>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _fadeAnim;
+  late Animation<double> _scaleAnim;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    );
+    _fadeAnim = Tween<double>(
+      begin: 0,
+      end: 1,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeIn));
+    _scaleAnim = Tween<double>(
+      begin: 0.8,
+      end: 1,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.elasticOut));
+    _controller.forward();
+    Future.delayed(const Duration(seconds: 3), () {
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          PageRouteBuilder(
+            pageBuilder: (_, __, ___) => const LoginScreen(),
+            transitionsBuilder: (_, anim, __, child) =>
+                FadeTransition(opacity: anim, child: child),
+            transitionDuration: const Duration(milliseconds: 800),
+          ),
+        );
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFF080C14),
+      body: Center(
+        child: FadeTransition(
+          opacity: _fadeAnim,
+          child: ScaleTransition(
+            scale: _scaleAnim,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 90,
+                  height: 90,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFFC9A84C), Color(0xFFFFE08A)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFC9A84C).withOpacity(0.5),
+                        blurRadius: 40,
+                        spreadRadius: 5,
+                      ),
+                    ],
+                  ),
+                  child: const Center(
+                    child: Text(
+                      '₿',
+                      style: TextStyle(fontSize: 40, color: Color(0xFF080C14)),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                ShaderMask(
+                  shaderCallback: (bounds) => const LinearGradient(
+                    colors: [Color(0xFFC9A84C), Color(0xFFFFE08A)],
+                  ).createShader(bounds),
+                  child: const Text(
+                    'FinFlow',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 40,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 3,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Seu dinheiro, sob controle',
+                  style: TextStyle(
+                    color: Color(0xFFAAAAAA),
+                    fontSize: 14,
+                    letterSpacing: 1,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// Login Screen
+class LoginScreen extends StatefulWidget {
+  const LoginScreen({super.key});
+
+  @override
+  State<LoginScreen> createState() => _LoginScreenState();
+}
+
+class _LoginScreenState extends State<LoginScreen>
+    with SingleTickerProviderStateMixin {
+  final _nomeCtrl = TextEditingController();
+  late AnimationController _controller;
+  late Animation<double> _fadeAnim;
+  late Animation<Offset> _slideAnim;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1000),
+    );
+    _fadeAnim = Tween<double>(
+      begin: 0,
+      end: 1,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeIn));
+    _slideAnim = Tween<Offset>(
+      begin: const Offset(0, 0.3),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
+    _controller.forward();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _nomeCtrl.dispose();
+    super.dispose();
+  }
+
+  void _entrar() async {
+    if (_nomeCtrl.text.trim().isEmpty) return;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('nome', _nomeCtrl.text.trim());
+    if (mounted) {
+      Navigator.pushReplacement(
+        context,
+        PageRouteBuilder(
+          pageBuilder: (_, __, ___) => HomePage(nome: _nomeCtrl.text.trim()),
+          transitionsBuilder: (_, anim, __, child) =>
+              FadeTransition(opacity: anim, child: child),
+          transitionDuration: const Duration(milliseconds: 800),
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFF080C14),
+      body: FadeTransition(
+        opacity: _fadeAnim,
+        child: SlideTransition(
+          position: _slideAnim,
+          child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ShaderMask(
+                  shaderCallback: (bounds) => const LinearGradient(
+                    colors: [Color(0xFFC9A84C), Color(0xFFFFE08A)],
+                  ).createShader(bounds),
+                  child: const Text(
+                    'Bem-vindo\nao FinFlow',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 40,
+                      fontWeight: FontWeight.w900,
+                      height: 1.1,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'Como podemos te chamar?',
+                  style: TextStyle(color: Color(0xFFAAAAAA), fontSize: 15),
+                ),
+                const SizedBox(height: 40),
+                TextField(
+                  controller: _nomeCtrl,
+                  style: const TextStyle(color: Colors.white, fontSize: 16),
+                  decoration: InputDecoration(
+                    labelText: 'Seu nome',
+                    labelStyle: const TextStyle(color: Color(0xFFAAAAAA)),
+                    filled: true,
+                    fillColor: const Color(0xFF0E1520),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide.none,
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: const BorderSide(
+                        color: Color(0xFFC9A84C),
+                        width: 1.5,
+                      ),
+                    ),
+                    prefixIcon: const Icon(
+                      Icons.person_outline,
+                      color: Color(0xFFC9A84C),
+                    ),
+                  ),
+                  onSubmitted: (_) => _entrar(),
+                ),
+                const SizedBox(height: 20),
+                GestureDetector(
+                  onTap: _entrar,
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 18),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFFC9A84C), Color(0xFFFFE08A)],
+                      ),
+                      borderRadius: BorderRadius.circular(14),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFFC9A84C).withOpacity(0.4),
+                          blurRadius: 20,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
+                    ),
+                    child: const Center(
+                      child: Text(
+                        'Entrar',
+                        style: TextStyle(
+                          color: Color(0xFF080C14),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                          letterSpacing: 1,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// Home Page
 class HomePage extends StatefulWidget {
-  const HomePage({super.key});
+  final String nome;
+  const HomePage({super.key, required this.nome});
 
   @override
   State<HomePage> createState() => _HomePageState();
 }
 
 class _HomePageState extends State<HomePage> {
-  final List<Transacao> _transacoes = [
-    Transacao(
-      icon: '🛒',
-      titulo: 'Supermercado',
-      subtitulo: 'Hoje, 09:30',
-      valor: 320,
-      isReceita: false,
-    ),
-    Transacao(
-      icon: '💼',
-      titulo: 'Salário',
-      subtitulo: 'Ontem, 08:00',
-      valor: 3200,
-      isReceita: true,
-    ),
-    Transacao(
-      icon: '⚡',
-      titulo: 'Conta de luz',
-      subtitulo: '25 Mai, 14:00',
-      valor: 180,
-      isReceita: false,
-    ),
-    Transacao(
-      icon: '🍔',
-      titulo: 'Restaurante',
-      subtitulo: '24 Mai, 20:15',
-      valor: 85,
-      isReceita: false,
-    ),
-    Transacao(
-      icon: '📱',
-      titulo: 'Internet',
-      subtitulo: '23 Mai, 11:00',
-      valor: 165,
-      isReceita: false,
-    ),
-  ];
+  final List<Transacao> _transacoes = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _carregarTransacoes();
+  }
+
+  Future<void> _carregarTransacoes() async {
+    final prefs = await SharedPreferences.getInstance();
+    final dados = prefs.getString('transacoes');
+    if (dados != null) {
+      final lista = jsonDecode(dados) as List;
+      setState(() {
+        _transacoes.addAll(lista.map((e) => Transacao.fromJson(e)));
+      });
+    } else {
+      setState(() {
+        _transacoes.addAll([
+          Transacao(
+            icon: '🛒',
+            titulo: 'Supermercado',
+            subtitulo: 'Hoje, 09:30',
+            valor: 320,
+            isReceita: false,
+          ),
+          Transacao(
+            icon: '💼',
+            titulo: 'Salário',
+            subtitulo: 'Ontem, 08:00',
+            valor: 3200,
+            isReceita: true,
+          ),
+          Transacao(
+            icon: '⚡',
+            titulo: 'Conta de luz',
+            subtitulo: '25 Mai, 14:00',
+            valor: 180,
+            isReceita: false,
+          ),
+          Transacao(
+            icon: '🍔',
+            titulo: 'Restaurante',
+            subtitulo: '24 Mai, 20:15',
+            valor: 85,
+            isReceita: false,
+          ),
+          Transacao(
+            icon: '📱',
+            titulo: 'Internet',
+            subtitulo: '23 Mai, 11:00',
+            valor: 165,
+            isReceita: false,
+          ),
+        ]);
+      });
+    }
+  }
+
+  Future<void> _salvarTransacoes() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      'transacoes',
+      jsonEncode(_transacoes.map((t) => t.toJson()).toList()),
+    );
+  }
 
   double get _totalReceitas =>
-      _transacoes.where((t) => t.isReceita).fold(0, (sum, t) => sum + t.valor);
+      _transacoes.where((t) => t.isReceita).fold(0, (s, t) => s + t.valor);
 
   double get _totalDespesas =>
-      _transacoes.where((t) => !t.isReceita).fold(0, (sum, t) => sum + t.valor);
+      _transacoes.where((t) => !t.isReceita).fold(0, (s, t) => s + t.valor);
 
   double get _saldo => _totalReceitas - _totalDespesas;
+
+  void _deletarTransacao(int index) {
+    setState(() => _transacoes.removeAt(index));
+    _salvarTransacoes();
+  }
 
   void _abrirFormulario() {
     final tituloCtrl = TextEditingController();
@@ -116,7 +449,6 @@ class _HomePageState extends State<HomePage> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Handle
               Center(
                 child: Container(
                   width: 40,
@@ -142,7 +474,6 @@ class _HomePageState extends State<HomePage> {
                 ),
               ),
               const SizedBox(height: 24),
-              // Tipo
               Row(
                 children: [
                   Expanded(
@@ -209,7 +540,6 @@ class _HomePageState extends State<HomePage> {
                 ],
               ),
               const SizedBox(height: 16),
-              // Campo título
               TextField(
                 controller: tituloCtrl,
                 style: const TextStyle(color: Colors.white),
@@ -225,7 +555,6 @@ class _HomePageState extends State<HomePage> {
                 ),
               ),
               const SizedBox(height: 12),
-              // Campo valor
               TextField(
                 controller: valorCtrl,
                 style: const TextStyle(color: Colors.white),
@@ -242,7 +571,6 @@ class _HomePageState extends State<HomePage> {
                 ),
               ),
               const SizedBox(height: 20),
-              // Botão salvar
               GestureDetector(
                 onTap: () {
                   final titulo = tituloCtrl.text.trim();
@@ -260,6 +588,7 @@ class _HomePageState extends State<HomePage> {
                       ),
                     );
                   });
+                  _salvarTransacoes();
                   Navigator.pop(ctx);
                 },
                 child: Container(
@@ -337,9 +666,9 @@ class _HomePageState extends State<HomePage> {
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            'Olá, Dev 👋',
-                            style: TextStyle(
+                          Text(
+                            'Olá, ${widget.nome} 👋',
+                            style: const TextStyle(
                               color: Color(0xFFAAAAAA),
                               fontSize: 13,
                             ),
@@ -370,10 +699,12 @@ class _HomePageState extends State<HomePage> {
                             colors: [Color(0xFFC9A84C), Color(0xFFFFE08A)],
                           ),
                         ),
-                        child: const Center(
+                        child: Center(
                           child: Text(
-                            'D',
-                            style: TextStyle(
+                            widget.nome.isNotEmpty
+                                ? widget.nome[0].toUpperCase()
+                                : 'U',
+                            style: const TextStyle(
                               color: Color(0xFF080C14),
                               fontWeight: FontWeight.bold,
                               fontSize: 18,
@@ -468,15 +799,34 @@ class _HomePageState extends State<HomePage> {
             sliver: SliverList(
               delegate: SliverChildBuilderDelegate((ctx, i) {
                 final t = _transacoes[i];
-                return _ItemTransacao(
-                  icon: t.icon,
-                  titulo: t.titulo,
-                  subtitulo: t.subtitulo,
-                  valor:
-                      '${t.isReceita ? '+' : '-'} R\$ ${t.valor.toStringAsFixed(2).replaceAll('.', ',')}',
-                  cor: t.isReceita
-                      ? const Color(0xFF4FC3F7)
-                      : const Color(0xFFFF6B6B),
+                return Dismissible(
+                  key: UniqueKey(),
+                  direction: DismissDirection.endToStart,
+                  onDismissed: (_) => _deletarTransacao(i),
+                  background: Container(
+                    margin: const EdgeInsets.only(bottom: 10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFF6B6B).withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    alignment: Alignment.centerRight,
+                    padding: const EdgeInsets.only(right: 20),
+                    child: const Icon(
+                      Icons.delete_outline,
+                      color: Color(0xFFFF6B6B),
+                      size: 26,
+                    ),
+                  ),
+                  child: _ItemTransacao(
+                    icon: t.icon,
+                    titulo: t.titulo,
+                    subtitulo: t.subtitulo,
+                    valor:
+                        '${t.isReceita ? '+' : '-'} R\$ ${t.valor.toStringAsFixed(2).replaceAll('.', ',')}',
+                    cor: t.isReceita
+                        ? const Color(0xFF4FC3F7)
+                        : const Color(0xFFFF6B6B),
+                  ),
                 );
               }, childCount: _transacoes.length),
             ),
