@@ -30,6 +30,7 @@ class Transacao {
   final String subtitulo;
   final double valor;
   final bool isReceita;
+  final String categoria;
 
   Transacao({
     required this.icon,
@@ -37,6 +38,7 @@ class Transacao {
     required this.subtitulo,
     required this.valor,
     required this.isReceita,
+    this.categoria = 'Outros',
   });
 
   Map<String, dynamic> toJson() => {
@@ -45,6 +47,7 @@ class Transacao {
     'subtitulo': subtitulo,
     'valor': valor,
     'isReceita': isReceita,
+    'categoria': categoria,
   };
 
   factory Transacao.fromJson(Map<String, dynamic> json) => Transacao(
@@ -53,6 +56,7 @@ class Transacao {
     subtitulo: json['subtitulo'],
     valor: json['valor'],
     isReceita: json['isReceita'],
+    categoria: json['categoria'] ?? 'Outros',
   );
 }
 
@@ -429,6 +433,7 @@ class _HomePageState extends State<HomePage> {
     final tituloCtrl = TextEditingController();
     final valorCtrl = TextEditingController();
     bool isReceita = false;
+    String categoria = 'Outros';
 
     showModalBottomSheet(
       context: context,
@@ -540,6 +545,54 @@ class _HomePageState extends State<HomePage> {
                 ],
               ),
               const SizedBox(height: 16),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children:
+                    [
+                          'Alimentação',
+                          'Moradia',
+                          'Transporte',
+                          'Lazer',
+                          'Salário',
+                          'Outros',
+                        ]
+                        .map(
+                          (c) => GestureDetector(
+                            onTap: () => setModalState(() => categoria = c),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 8,
+                              ),
+                              decoration: BoxDecoration(
+                                color: categoria == c
+                                    ? const Color(0xFFC9A84C).withOpacity(0.2)
+                                    : Colors.white.withOpacity(0.05),
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                  color: categoria == c
+                                      ? const Color(0xFFC9A84C)
+                                      : Colors.white12,
+                                ),
+                              ),
+                              child: Text(
+                                c,
+                                style: TextStyle(
+                                  color: categoria == c
+                                      ? const Color(0xFFC9A84C)
+                                      : Colors.white54,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ),
+                        )
+                        .toList(),
+              ),
+              const SizedBox(height: 16),
               TextField(
                 controller: tituloCtrl,
                 style: const TextStyle(color: Colors.white),
@@ -585,6 +638,7 @@ class _HomePageState extends State<HomePage> {
                         subtitulo: 'Agora',
                         valor: valor,
                         isReceita: isReceita,
+                        categoria: categoria,
                       ),
                     );
                   });
@@ -836,7 +890,7 @@ class _HomePageState extends State<HomePage> {
                     child: _ItemTransacao(
                       icon: t.icon,
                       titulo: t.titulo,
-                      subtitulo: t.subtitulo,
+                      subtitulo: '${t.categoria} • ${t.subtitulo}',
                       valor:
                           '${t.isReceita ? '+' : '-'} R\$ ${t.valor.toStringAsFixed(2).replaceAll('.', ',')}',
                       cor: t.isReceita
