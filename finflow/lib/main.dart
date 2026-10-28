@@ -350,6 +350,7 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   final List<Transacao> _transacoes = [];
+  String get _chave => 'transacoes_${widget.nome.trim().toLowerCase()}';
 
   @override
   void initState() {
@@ -359,7 +360,7 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _carregarTransacoes() async {
     final prefs = await SharedPreferences.getInstance();
-    final dados = prefs.getString('transacoes');
+    final dados = prefs.getString(_chave);
     if (dados != null) {
       final lista = jsonDecode(dados) as List;
       setState(() {
@@ -411,7 +412,7 @@ class _HomePageState extends State<HomePage> {
   Future<void> _salvarTransacoes() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(
-      'transacoes',
+      _chave,
       jsonEncode(_transacoes.map((t) => t.toJson()).toList()),
     );
   }
@@ -423,6 +424,13 @@ class _HomePageState extends State<HomePage> {
       _transacoes.where((t) => !t.isReceita).fold(0, (s, t) => s + t.valor);
 
   double get _saldo => _totalReceitas - _totalDespesas;
+  Map<String, double> get _gastosPorCategoria {
+    final mapa = <String, double>{};
+    for (final t in _transacoes.where((t) => !t.isReceita)) {
+      mapa[t.categoria] = (mapa[t.categoria] ?? 0) + t.valor;
+    }
+    return mapa;
+  }
 
   void _deletarTransacao(int index) {
     setState(() => _transacoes.removeAt(index));
@@ -827,6 +835,9 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
           ),
+          SliverToBoxAdapter(
+            child: _GraficoCategorias(dados: _gastosPorCategoria),
+          ),
           const SliverToBoxAdapter(
             child: Padding(
               padding: EdgeInsets.fromLTRB(24, 28, 24, 12),
@@ -1058,6 +1069,105 @@ class _ItemTransacao extends StatelessWidget {
               color: cor,
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _GraficoCategorias extends StatelessWidget {
+  final Map<String, double> dados;
+  const _GraficoCategorias({required this.dados});
+
+  @override
+  Widget build(BuildContext context) {
+    if (dados.isEmpty) return const SizedBox.shrink();
+    final total = dados.values.fold<double>(0, (s, v) => s + v);
+    final itens = dados.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(24, 28, 24, 0),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0E1520),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withOpacity(0.06)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Gastos por categoria',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 17,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 16),
+          ...itens.map((e) {
+            final pct = total == 0 ? 0.0 : e.value / total;
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        e.key,
+                        style: const TextStyle(
+                          color: Color(0xFFAAAAAA),
+                          fontSize: 13,
+                        ),
+                      ),
+                      Text(
+                        'R\$ ${e.value.toStringAsFixed(2).replaceAll('.', ',')}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(6),
+                    child: Stack(
+                      children: [
+                        Container(
+                          height: 8,
+                          color: Colors.white.withOpacity(0.06),
+                        ),
+                        TweenAnimationBuilder<double>(
+                          tween: Tween<double>(begin: 0, end: pct),
+                          duration: const Duration(milliseconds: 900),
+                          curve: Curves.easeOutCubic,
+                          builder: (context, v, _) => FractionallySizedBox(
+                            widthFactor: v.clamp(0.0, 1.0),
+                            child: Container(
+                              height: 8,
+                              decoration: const BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [
+                                    Color(0xFFC9A84C),
+                                    Color(0xFFFFE08A),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
         ],
       ),
     );
