@@ -56,7 +56,7 @@ class Transacao {
   );
 }
 
-// Splash Screen
+// ---------------- SPLASH ----------------
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
@@ -177,7 +177,7 @@ class _SplashScreenState extends State<SplashScreen>
   }
 }
 
-// Login Screen
+// ---------------- LOGIN ----------------
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -335,7 +335,7 @@ class _LoginScreenState extends State<LoginScreen>
   }
 }
 
-// Home Page
+// ---------------- HOME ----------------
 class HomePage extends StatefulWidget {
   final String nome;
   const HomePage({super.key, required this.nome});
@@ -732,13 +732,18 @@ class _HomePageState extends State<HomePage> {
                         Color(0xFFC9A84C),
                       ],
                     ).createShader(bounds),
-                    child: Text(
-                      'R\$ ${_saldo.toStringAsFixed(2).replaceAll('.', ',')}',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 44,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: -1.5,
+                    child: TweenAnimationBuilder<double>(
+                      tween: Tween<double>(begin: 0, end: _saldo),
+                      duration: const Duration(milliseconds: 1200),
+                      curve: Curves.easeOutCubic,
+                      builder: (context, valor, _) => Text(
+                        'R\$ ${valor.toStringAsFixed(2).replaceAll('.', ',')}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 44,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: -1.5,
+                        ),
                       ),
                     ),
                   ),
@@ -799,33 +804,45 @@ class _HomePageState extends State<HomePage> {
             sliver: SliverList(
               delegate: SliverChildBuilderDelegate((ctx, i) {
                 final t = _transacoes[i];
-                return Dismissible(
-                  key: UniqueKey(),
-                  direction: DismissDirection.endToStart,
-                  onDismissed: (_) => _deletarTransacao(i),
-                  background: Container(
-                    margin: const EdgeInsets.only(bottom: 10),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFF6B6B).withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    alignment: Alignment.centerRight,
-                    padding: const EdgeInsets.only(right: 20),
-                    child: const Icon(
-                      Icons.delete_outline,
-                      color: Color(0xFFFF6B6B),
-                      size: 26,
+                return TweenAnimationBuilder<double>(
+                  tween: Tween<double>(begin: 0, end: 1),
+                  duration: Duration(milliseconds: 400 + (i < 6 ? i : 6) * 100),
+                  curve: Curves.easeOutCubic,
+                  builder: (context, v, child) => Opacity(
+                    opacity: v,
+                    child: Transform.translate(
+                      offset: Offset(0, 30 * (1 - v)),
+                      child: child,
                     ),
                   ),
-                  child: _ItemTransacao(
-                    icon: t.icon,
-                    titulo: t.titulo,
-                    subtitulo: t.subtitulo,
-                    valor:
-                        '${t.isReceita ? '+' : '-'} R\$ ${t.valor.toStringAsFixed(2).replaceAll('.', ',')}',
-                    cor: t.isReceita
-                        ? const Color(0xFF4FC3F7)
-                        : const Color(0xFFFF6B6B),
+                  child: Dismissible(
+                    key: UniqueKey(),
+                    direction: DismissDirection.endToStart,
+                    onDismissed: (_) => _deletarTransacao(i),
+                    background: Container(
+                      margin: const EdgeInsets.only(bottom: 10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFF6B6B).withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      alignment: Alignment.centerRight,
+                      padding: const EdgeInsets.only(right: 20),
+                      child: const Icon(
+                        Icons.delete_outline,
+                        color: Color(0xFFFF6B6B),
+                        size: 26,
+                      ),
+                    ),
+                    child: _ItemTransacao(
+                      icon: t.icon,
+                      titulo: t.titulo,
+                      subtitulo: t.subtitulo,
+                      valor:
+                          '${t.isReceita ? '+' : '-'} R\$ ${t.valor.toStringAsFixed(2).replaceAll('.', ',')}',
+                      cor: t.isReceita
+                          ? const Color(0xFF4FC3F7)
+                          : const Color(0xFFFF6B6B),
+                    ),
                   ),
                 );
               }, childCount: _transacoes.length),
