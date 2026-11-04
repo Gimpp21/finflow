@@ -445,6 +445,20 @@ class _HomePageState extends State<HomePage> {
     return mapa;
   }
 
+  Future<void> _sair() async {
+    await FirebaseAuth.instance.signOut();
+    if (!mounted) return;
+    Navigator.pushReplacement(
+      context,
+      PageRouteBuilder(
+        pageBuilder: (_, __, ___) => const AuthScreen(),
+        transitionsBuilder: (_, anim, __, child) =>
+            FadeTransition(opacity: anim, child: child),
+        transitionDuration: const Duration(milliseconds: 600),
+      ),
+    );
+  }
+
   void _deletarTransacao(int index) {
     setState(() => _transacoes.removeAt(index));
     _salvarTransacoes();
@@ -765,24 +779,64 @@ class _HomePageState extends State<HomePage> {
                           ),
                         ],
                       ),
-                      Container(
-                        width: 44,
-                        height: 44,
-                        decoration: const BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: LinearGradient(
-                            colors: [Color(0xFFC9A84C), Color(0xFFFFE08A)],
-                          ),
+                      PopupMenuButton<String>(
+                        color: const Color(0xFF0E1520),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
                         ),
-                        child: Center(
-                          child: Text(
-                            widget.nome.isNotEmpty
-                                ? widget.nome[0].toUpperCase()
-                                : 'U',
-                            style: const TextStyle(
-                              color: Color(0xFF080C14),
-                              fontWeight: FontWeight.bold,
-                              fontSize: 18,
+                        offset: const Offset(0, 52),
+                        onSelected: (v) {
+                          if (v == 'sair') _sair();
+                        },
+                        itemBuilder: (_) => [
+                          PopupMenuItem<String>(
+                            enabled: false,
+                            child: Text(
+                              FirebaseAuth.instance.currentUser?.email ??
+                                  widget.nome,
+                              style: const TextStyle(
+                                color: Color(0xFFAAAAAA),
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                          const PopupMenuItem<String>(
+                            value: 'sair',
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.logout,
+                                  color: Color(0xFFFF6B6B),
+                                  size: 18,
+                                ),
+                                SizedBox(width: 10),
+                                Text(
+                                  'Sair',
+                                  style: TextStyle(color: Colors.white),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                        child: Container(
+                          width: 44,
+                          height: 44,
+                          decoration: const BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: LinearGradient(
+                              colors: [Color(0xFFC9A84C), Color(0xFFFFE08A)],
+                            ),
+                          ),
+                          child: Center(
+                            child: Text(
+                              widget.nome.isNotEmpty
+                                  ? widget.nome[0].toUpperCase()
+                                  : 'U',
+                              style: const TextStyle(
+                                color: Color(0xFF080C14),
+                                fontWeight: FontWeight.bold,
+                                fontSize: 18,
+                              ),
                             ),
                           ),
                         ),
