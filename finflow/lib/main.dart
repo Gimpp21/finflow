@@ -1,8 +1,12 @@
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   runApp(const FinFlowApp());
 }
 
@@ -124,14 +128,14 @@ class _SplashScreenState extends State<SplashScreen>
               mainAxisSize: MainAxisSize.min,
               children: [
                 Container(
-                  width: 90,
-                  height: 90,
+                  width: 120,
+                  height: 120,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFFC9A84C), Color(0xFFFFE08A)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
+                    color: const Color(0xFF0A1628),
+                    border: Border.all(
+                      color: const Color(0xFFC9A84C),
+                      width: 2,
                     ),
                     boxShadow: [
                       BoxShadow(
@@ -141,11 +145,9 @@ class _SplashScreenState extends State<SplashScreen>
                       ),
                     ],
                   ),
-                  child: const Center(
-                    child: Text(
-                      '₿',
-                      style: TextStyle(fontSize: 40, color: Color(0xFF080C14)),
-                    ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(10),
+                    child: Image.asset('assets/icon/icon_foreground.png'),
                   ),
                 ),
                 const SizedBox(height: 24),
