@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'package:flutter/material.dart';
@@ -99,7 +100,15 @@ class _SplashScreenState extends State<SplashScreen>
         Navigator.pushReplacement(
           context,
           PageRouteBuilder(
-            pageBuilder: (_, __, ___) => const LoginScreen(),
+            pageBuilder: (_, __, ___) {
+              final user = FirebaseAuth.instance.currentUser;
+              if (user == null) return const AuthScreen();
+              final nome =
+                  (user.displayName != null && user.displayName!.isNotEmpty)
+                  ? user.displayName!
+                  : (user.email ?? 'Usuário').split('@').first;
+              return HomePage(nome: nome, uid: user.uid);
+            },
             transitionsBuilder: (_, anim, __, child) =>
                 FadeTransition(opacity: anim, child: child),
             transitionDuration: const Duration(milliseconds: 800),
@@ -344,15 +353,17 @@ class _LoginScreenState extends State<LoginScreen>
 // ---------------- HOME ----------------
 class HomePage extends StatefulWidget {
   final String nome;
-  const HomePage({super.key, required this.nome});
-
+  final String uid;
+  const HomePage({super.key, required this.nome, this.uid = ''});
   @override
   State<HomePage> createState() => _HomePageState();
 }
 
 class _HomePageState extends State<HomePage> {
   final List<Transacao> _transacoes = [];
-  String get _chave => 'transacoes_${widget.nome.trim().toLowerCase()}';
+  String get _chave => widget.uid.isNotEmpty
+      ? 'transacoes_${widget.uid}'
+      : 'transacoes_${widget.nome.trim().toLowerCase()}';
 
   @override
   void initState() {
@@ -1171,6 +1182,273 @@ class _GraficoCategorias extends StatelessWidget {
             );
           }),
         ],
+      ),
+    );
+  }
+}
+
+class AuthScreen extends StatefulWidget {
+  const AuthScreen({super.key});
+
+  @override
+  State<AuthScreen> createState() => _AuthScreenState();
+}
+
+class _AuthScreenState extends State<AuthScreen> {
+  final _nomeCtrl = TextEditingController();
+  final _emailCtrl = TextEditingController();
+  final _senhaCtrl = TextEditingController();
+  bool _criarConta = false;
+  bool _carregando = false;
+  bool _verSenha = false;
+  String? _erro;
+
+  @override
+  void dispose() {
+    _nomeCtrl.dispose();
+    _emailCtrl.dispose();
+    _senhaCtrl.dispose();
+    super.dispose();
+  }
+
+  String _traduzErro(String code) {
+    switch (code) {
+      case 'invalid-email':
+        return 'E-mail inválido.';
+      case 'user-not-found':
+      case 'wrong-password':
+      case 'invalid-credential':
+        return 'E-mail ou senha incorretos.';
+      case 'email-already-in-use':
+        return 'Esse e-mail já tem conta.';
+      case 'weak-password':
+        return 'Senha fraca. Use 6 caracteres ou mais.';
+      case 'network-request-failed':
+        return 'Sem internet. Tente de novo.';
+      case 'too-many-requests':
+        return 'Muitas tentativas. Aguarde um pouco.';
+      default:
+        return 'Algo deu errado. Tente de novo.';
+    }
+  }
+
+  Future<void> _enviar() async {
+    final email = _emailCtrl.text.trim();
+    final senha = _senhaCtrl.text;
+    final nome = _nomeCtrl.text.trim();
+    if (email.isEmpty || senha.isEmpty || (_criarConta && nome.isEmpty)) {
+      setState(() => _erro = 'Preencha todos os campos.');
+      return;
+    }
+    setState(() {
+      _carregando = true;
+      _erro = null;
+    });
+    try {
+      UserCredential cred;
+      if (_criarConta) {
+        cred = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+          email: email,
+          password: senha,
+        );
+        await cred.user?.updateDisplayName(nome);
+      } else {
+        cred = await FirebaseAuth.instance.signInWithEmailAndPassword(
+          email: email,
+          password: senha,
+        );
+      }
+      final user = cred.user!;
+      final nomeFinal =
+          (user.displayName != null && user.displayName!.isNotEmpty)
+          ? user.displayName!
+          : (nome.isNotEmpty ? nome : email.split('@').first);
+      if (!mounted) return;
+      Navigator.pushReplacement(
+        context,
+        PageRouteBuilder(
+          pageBuilder: (_, __, ___) => HomePage(nome: nomeFinal, uid: user.uid),
+          transitionsBuilder: (_, anim, __, child) =>
+              FadeTransition(opacity: anim, child: child),
+          transitionDuration: const Duration(milliseconds: 800),
+        ),
+      );
+    } on FirebaseAuthException catch (e) {
+      setState(() => _erro = _traduzErro(e.code));
+    } catch (_) {
+      setState(() => _erro = 'Algo deu errado. Tente de novo.');
+    } finally {
+      if (mounted) setState(() => _carregando = false);
+    }
+  }
+
+  InputDecoration _deco(String label, IconData icon, {Widget? suffix}) {
+    return InputDecoration(
+      labelText: label,
+      labelStyle: const TextStyle(color: Color(0xFFAAAAAA)),
+      filled: true,
+      fillColor: const Color(0xFF0E1520),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide.none,
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: Color(0xFFC9A84C), width: 1.5),
+      ),
+      prefixIcon: Icon(icon, color: const Color(0xFFC9A84C)),
+      suffixIcon: suffix,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFF080C14),
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Image.asset(
+                    'assets/icon/icon_foreground.png',
+                    width: 110,
+                    height: 110,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                ShaderMask(
+                  shaderCallback: (bounds) => const LinearGradient(
+                    colors: [Color(0xFFC9A84C), Color(0xFFFFE08A)],
+                  ).createShader(bounds),
+                  child: Text(
+                    _criarConta ? 'Criar conta' : 'Bem-vindo\nde volta',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 36,
+                      fontWeight: FontWeight.w900,
+                      height: 1.1,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  _criarConta
+                      ? 'Leva menos de um minuto.'
+                      : 'Entre para ver suas finanças.',
+                  style: const TextStyle(
+                    color: Color(0xFFAAAAAA),
+                    fontSize: 15,
+                  ),
+                ),
+                const SizedBox(height: 28),
+                if (_criarConta) ...[
+                  TextField(
+                    controller: _nomeCtrl,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: _deco('Seu nome', Icons.person_outline),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                TextField(
+                  controller: _emailCtrl,
+                  keyboardType: TextInputType.emailAddress,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: _deco('E-mail', Icons.mail_outline),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _senhaCtrl,
+                  obscureText: !_verSenha,
+                  style: const TextStyle(color: Colors.white),
+                  onSubmitted: (_) => _enviar(),
+                  decoration: _deco(
+                    'Senha',
+                    Icons.lock_outline,
+                    suffix: IconButton(
+                      icon: Icon(
+                        _verSenha ? Icons.visibility_off : Icons.visibility,
+                        color: const Color(0xFFAAAAAA),
+                      ),
+                      onPressed: () => setState(() => _verSenha = !_verSenha),
+                    ),
+                  ),
+                ),
+                if (_erro != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 12),
+                    child: Text(
+                      _erro!,
+                      style: const TextStyle(
+                        color: Color(0xFFFF6B6B),
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
+                const SizedBox(height: 20),
+                GestureDetector(
+                  onTap: _carregando ? null : _enviar,
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 18),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFFC9A84C), Color(0xFFFFE08A)],
+                      ),
+                      borderRadius: BorderRadius.circular(14),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFFC9A84C).withOpacity(0.4),
+                          blurRadius: 20,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
+                    ),
+                    child: Center(
+                      child: _carregando
+                          ? const SizedBox(
+                              height: 22,
+                              width: 22,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.5,
+                                color: Color(0xFF080C14),
+                              ),
+                            )
+                          : Text(
+                              _criarConta ? 'Criar conta' : 'Entrar',
+                              style: const TextStyle(
+                                color: Color(0xFF080C14),
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                                letterSpacing: 1,
+                              ),
+                            ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Center(
+                  child: TextButton(
+                    onPressed: () => setState(() {
+                      _criarConta = !_criarConta;
+                      _erro = null;
+                    }),
+                    child: Text(
+                      _criarConta ? 'Já tenho conta' : 'Criar conta nova',
+                      style: const TextStyle(
+                        color: Color(0xFFC9A84C),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
