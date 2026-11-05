@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
@@ -59,7 +60,7 @@ class Transacao {
     icon: json['icon'],
     titulo: json['titulo'],
     subtitulo: json['subtitulo'],
-    valor: json['valor'],
+    valor: (json['valor'] as num).toDouble(),
     isReceita: json['isReceita'],
     categoria: json['categoria'] ?? 'Outros',
   );
@@ -371,16 +372,44 @@ class _HomePageState extends State<HomePage> {
     _carregarTransacoes();
   }
 
+  DocumentReference<Map<String, dynamic>>? get _doc => widget.uid.isEmpty
+      ? null
+      : FirebaseFirestore.instance
+            .collection('usuarios')
+            .doc(widget.uid)
+            .collection('dados')
+            .doc('transacoes');
+
   Future<void> _carregarTransacoes() async {
-    final prefs = await SharedPreferences.getInstance();
-    final dados = prefs.getString(_chave);
-    if (dados != null) {
-      final lista = jsonDecode(dados) as List;
-      setState(() {
-        _transacoes.addAll(lista.map((e) => Transacao.fromJson(e)));
-      });
-    } else {
-      setState(() {
+    List? lista;
+    bool veioDoCelular = false;
+
+    try {
+      final snap = await _doc?.get();
+      if (snap != null && snap.exists) {
+        lista = snap.data()?['lista'] as List?;
+      }
+    } catch (_) {}
+
+    if (lista == null) {
+      final prefs = await SharedPreferences.getInstance();
+      final dados = prefs.getString(_chave);
+      if (dados != null) {
+        lista = jsonDecode(dados) as List;
+        veioDoCelular = true;
+      }
+    }
+
+    if (!mounted) return;
+    final dadosFinais = lista;
+    setState(() {
+      if (dadosFinais != null) {
+        _transacoes.addAll(
+          dadosFinais.map(
+            (e) => Transacao.fromJson(Map<String, dynamic>.from(e as Map)),
+          ),
+        );
+      } else {
         _transacoes.addAll([
           Transacao(
             icon: '🛒',
@@ -388,6 +417,7 @@ class _HomePageState extends State<HomePage> {
             subtitulo: 'Hoje, 09:30',
             valor: 320,
             isReceita: false,
+            categoria: 'Alimentação',
           ),
           Transacao(
             icon: '💼',
@@ -395,6 +425,7 @@ class _HomePageState extends State<HomePage> {
             subtitulo: 'Ontem, 08:00',
             valor: 3200,
             isReceita: true,
+            categoria: 'Salário',
           ),
           Transacao(
             icon: '⚡',
@@ -402,6 +433,7 @@ class _HomePageState extends State<HomePage> {
             subtitulo: '25 Mai, 14:00',
             valor: 180,
             isReceita: false,
+            categoria: 'Moradia',
           ),
           Transacao(
             icon: '🍔',
@@ -409,6 +441,7 @@ class _HomePageState extends State<HomePage> {
             subtitulo: '24 Mai, 20:15',
             valor: 85,
             isReceita: false,
+            categoria: 'Alimentação',
           ),
           Transacao(
             icon: '📱',
@@ -416,18 +449,21 @@ class _HomePageState extends State<HomePage> {
             subtitulo: '23 Mai, 11:00',
             valor: 165,
             isReceita: false,
+            categoria: 'Moradia',
           ),
         ]);
-      });
-    }
+      }
+    });
+    if (veioDoCelular) _salvarTransacoes();
   }
 
   Future<void> _salvarTransacoes() async {
+    final json = _transacoes.map((t) => t.toJson()).toList();
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
-      _chave,
-      jsonEncode(_transacoes.map((t) => t.toJson()).toList()),
-    );
+    await prefs.setString(_chave, jsonEncode(json));
+    try {
+      await _doc?.set({'lista': json});
+    } catch (_) {}
   }
 
   double get _totalReceitas =>
