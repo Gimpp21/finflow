@@ -37,6 +37,7 @@ class Transacao {
   final double valor;
   final bool isReceita;
   final String categoria;
+  final DateTime data;
 
   Transacao({
     required this.icon,
@@ -45,7 +46,8 @@ class Transacao {
     required this.valor,
     required this.isReceita,
     this.categoria = 'Outros',
-  });
+    DateTime? data,
+  }) : data = data ?? DateTime.now();
 
   Map<String, dynamic> toJson() => {
     'icon': icon,
@@ -54,6 +56,7 @@ class Transacao {
     'valor': valor,
     'isReceita': isReceita,
     'categoria': categoria,
+    'data': data.millisecondsSinceEpoch,
   };
 
   factory Transacao.fromJson(Map<String, dynamic> json) => Transacao(
@@ -63,6 +66,9 @@ class Transacao {
     valor: (json['valor'] as num).toDouble(),
     isReceita: json['isReceita'],
     categoria: json['categoria'] ?? 'Outros',
+    data: json['data'] != null
+        ? DateTime.fromMillisecondsSinceEpoch((json['data'] as num).toInt())
+        : null,
   );
 }
 
@@ -362,6 +368,33 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   final List<Transacao> _transacoes = [];
+  DateTime _mes = DateTime(DateTime.now().year, DateTime.now().month);
+
+  List<Transacao> get _doMes => _transacoes
+      .where((t) => t.data.year == _mes.year && t.data.month == _mes.month)
+      .toList();
+
+  void _mudarMes(int delta) =>
+      setState(() => _mes = DateTime(_mes.year, _mes.month + delta));
+
+  String get _nomeMes {
+    const nomes = [
+      'Janeiro',
+      'Fevereiro',
+      'Março',
+      'Abril',
+      'Maio',
+      'Junho',
+      'Julho',
+      'Agosto',
+      'Setembro',
+      'Outubro',
+      'Novembro',
+      'Dezembro',
+    ];
+    return '${nomes[_mes.month - 1]} ${_mes.year}';
+  }
+
   String get _chave => widget.uid.isNotEmpty
       ? 'transacoes_${widget.uid}'
       : 'transacoes_${widget.nome.trim().toLowerCase()}';
@@ -467,15 +500,16 @@ class _HomePageState extends State<HomePage> {
   }
 
   double get _totalReceitas =>
-      _transacoes.where((t) => t.isReceita).fold(0, (s, t) => s + t.valor);
+      _doMes.where((t) => t.isReceita).fold(0, (s, t) => s + t.valor);
 
   double get _totalDespesas =>
-      _transacoes.where((t) => !t.isReceita).fold(0, (s, t) => s + t.valor);
+      _doMes.where((t) => !t.isReceita).fold(0, (s, t) => s + t.valor);
 
-  double get _saldo => _totalReceitas - _totalDespesas;
+  double get _saldo =>
+      _transacoes.fold(0, (s, t) => s + (t.isReceita ? t.valor : -t.valor));
   Map<String, double> get _gastosPorCategoria {
     final mapa = <String, double>{};
-    for (final t in _transacoes.where((t) => !t.isReceita)) {
+    for (final t in _doMes.where((t) => !t.isReceita)) {
       mapa[t.categoria] = (mapa[t.categoria] ?? 0) + t.valor;
     }
     return mapa;
@@ -495,8 +529,8 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  void _deletarTransacao(int index) {
-    setState(() => _transacoes.removeAt(index));
+  void _deletarTransacao(Transacao t) {
+    setState(() => _transacoes.remove(t));
     _salvarTransacoes();
   }
 
@@ -504,6 +538,7 @@ class _HomePageState extends State<HomePage> {
     final tituloCtrl = TextEditingController();
     final valorCtrl = TextEditingController();
     bool isReceita = false;
+    DateTime dataSel = DateTime.now();
     String categoria = 'Outros';
 
     showModalBottomSheet(
@@ -664,6 +699,44 @@ class _HomePageState extends State<HomePage> {
                         .toList(),
               ),
               const SizedBox(height: 16),
+              GestureDetector(
+                onTap: () async {
+                  final escolhida = await showDatePicker(
+                    context: ctx,
+                    initialDate: dataSel,
+                    firstDate: DateTime(2020),
+                    lastDate: DateTime.now(),
+                  );
+                  if (escolhida != null)
+                    setModalState(() => dataSel = escolhida);
+                },
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 16,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.05),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.calendar_today,
+                        color: Color(0xFFC9A84C),
+                        size: 18,
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        '${dataSel.day.toString().padLeft(2, '0')}/${dataSel.month.toString().padLeft(2, '0')}/${dataSel.year}',
+                        style: const TextStyle(color: Colors.white),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
               TextField(
                 controller: tituloCtrl,
                 style: const TextStyle(color: Colors.white),
@@ -706,10 +779,13 @@ class _HomePageState extends State<HomePage> {
                       Transacao(
                         icon: isReceita ? '💰' : '💸',
                         titulo: titulo,
-                        subtitulo: 'Agora',
+                        subtitulo: DateUtils.isSameDay(dataSel, DateTime.now())
+                            ? 'Agora'
+                            : '${dataSel.day.toString().padLeft(2, '0')}/${dataSel.month.toString().padLeft(2, '0')}/${dataSel.year}',
                         valor: valor,
                         isReceita: isReceita,
                         categoria: categoria,
+                        data: dataSel,
                       ),
                     );
                   });
@@ -939,6 +1015,38 @@ class _HomePageState extends State<HomePage> {
             ),
           ),
           SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(12, 20, 12, 0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  IconButton(
+                    onPressed: () => _mudarMes(-1),
+                    icon: const Icon(
+                      Icons.chevron_left,
+                      color: Color(0xFFC9A84C),
+                    ),
+                  ),
+                  Text(
+                    _nomeMes,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => _mudarMes(1),
+                    icon: const Icon(
+                      Icons.chevron_right,
+                      color: Color(0xFFC9A84C),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          SliverToBoxAdapter(
             child: _GraficoCategorias(dados: _gastosPorCategoria),
           ),
           const SliverToBoxAdapter(
@@ -971,7 +1079,7 @@ class _HomePageState extends State<HomePage> {
             padding: const EdgeInsets.fromLTRB(24, 0, 24, 100),
             sliver: SliverList(
               delegate: SliverChildBuilderDelegate((ctx, i) {
-                final t = _transacoes[i];
+                final t = _doMes[i];
                 return TweenAnimationBuilder<double>(
                   tween: Tween<double>(begin: 0, end: 1),
                   duration: Duration(milliseconds: 400 + (i < 6 ? i : 6) * 100),
@@ -986,7 +1094,7 @@ class _HomePageState extends State<HomePage> {
                   child: Dismissible(
                     key: UniqueKey(),
                     direction: DismissDirection.endToStart,
-                    onDismissed: (_) => _deletarTransacao(i),
+                    onDismissed: (_) => _deletarTransacao(t),
                     background: Container(
                       margin: const EdgeInsets.only(bottom: 10),
                       decoration: BoxDecoration(
@@ -1013,7 +1121,7 @@ class _HomePageState extends State<HomePage> {
                     ),
                   ),
                 );
-              }, childCount: _transacoes.length),
+              }, childCount: _doMes.length),
             ),
           ),
         ],
